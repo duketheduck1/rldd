@@ -62,7 +62,7 @@ class DeltaDebuggingEnv(gym.Env):
 
     def reset(self):
         self.current_state =  [1 for i in self.program]
-        self.max_steps = 1000
+        self.max_steps = 100
         return self.current_state
     def get_parameters(self):
         results = {
@@ -216,7 +216,7 @@ def run(problematic_program, target_state, test_code):
     env = DeltaDebuggingEnv(data, datatg)    
     agent = DQNAgent(env, epsilon = 0.19, gamma = 0.75)    
     
-    rewards, state, scores = train_agent(env, agent, 10)
+    rewards, state, scores = train_agent(env, agent, 1000)
     
     print("Pro 1:",state)    
     temp = state
