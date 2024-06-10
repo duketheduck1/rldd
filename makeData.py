@@ -21,7 +21,8 @@ class convertData:
 
     def encode_state(self, code):
         tree = ast.parse(code)
-        codeprogram = [node for node in ast.walk(tree) if isinstance(node, ast.stmt)]
+        # codeprogram = [node for node in ast.walk(tree) if isinstance(node, ast.stmt)]
+        codeprogram = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
         program = [self.hashcode() for e in codeprogram]
         encoder = _MLB.fit([program])
         return tree, program, codeprogram, encoder, len(program)

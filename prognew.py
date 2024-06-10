@@ -77,7 +77,7 @@ class DeltaDebuggingEnv(gym.Env):
 
 # DQN Agent
 class DQNAgent:
-    def __init__(self, env, epsilon = 0.19, gamma = 0.75):
+    def __init__(self, env, epsilon = 0.1, gamma = 0.99):
         self.state_dim = len(env.program)
         self.action_dim = self.state_dim
         self.model = self.build_model()
@@ -87,10 +87,10 @@ class DQNAgent:
         self.batch_size = self.state_dim
         self.memory = []        
         self.datacheck = []
+        
 
     def build_model(self):
         model = keras.Sequential([            
-            layers.Dense(24, activation='relu'),
             layers.Dense(24, activation='relu'),
             layers.Dense(self.action_dim, activation='linear')
         ])
@@ -101,11 +101,11 @@ class DQNAgent:
         if random.random() < self.epsilon:
             action = random.randint(0, len(state)-1)
         else:            
-            q_values = self.model.predict([state])            
+            q_values = self.model.predict(np.array([state]))            
             emin =  np.min(q_values) - 1
-            emax =  np.max(q_values) +1
+            emax =  np.max(q_values) + 1
             action = np.argmax([q_values[0][i] if state[i] else emin for i in range(len(state))])
-            #action = np.argmin([q_values[0][i] if state[i] else emax for i in range(len(state))])
+            # action = np.argmin([q_values[0][i] if state[i] else emax for i in range(len(state))])
             '''a=[1,2,3,4,5]
             b=[0,1,0,0,1]
             amax=max(a)+1
@@ -127,8 +127,8 @@ class DQNAgent:
     def calculate_target_q_values(self, batch):        
         target_q_values = []
         for state, action, reward, next_state, done in batch:            
-            q_values = self.model.predict([state])            
-            next_q_values = self.model.predict([next_state])
+            q_values = self.model.predict(np.array([state]))            
+            next_q_values = self.model.predict(np.array([next_state]))
             if done:
                 q_values[0][action] = reward
             else:
@@ -136,7 +136,7 @@ class DQNAgent:
             target_q_values.append(q_values[0])        
         return target_q_values
     
-    def get_parameters(self):
+    def get_parameters(self, rewards, state, scores):
         results = {
             'state_dim': self.state_dim,
             'action_dim': self.action_dim,
@@ -145,7 +145,10 @@ class DQNAgent:
             'num_actions': self.num_actions,
             'batch_size': self.batch_size,
             'memory': self.memory,            
-            'datacheck': self.datacheck
+            'datacheck': self.datacheck,
+            'rewards': rewards,
+            'state': state,
+            'scores': scores
         }
         return results
         
@@ -163,6 +166,8 @@ def train_agent(env, agent, enpisodes):
     
     rewards=[]
     scores = []
+    total = []
+    count = 0
     for episode in range(enpisodes ):
         state = env.reset() 
         done = False
@@ -181,9 +186,14 @@ def train_agent(env, agent, enpisodes):
             
         avg_reward = sum(total_reward)/len(total_reward)
         rewards.append(avg_reward)
-        scores.append(sum(avgscore)/len(avgscore))
+        avg_scores = sum(avgscore)/len(avgscore)
+        scores.append(avg_scores)
+        total.append([count,avg_reward, avg_scores, state]) #4 element
+        count +=1
+
         print(f"Episode {episode}, AvgReward: {avg_reward}")
-    return rewards, state, scores
+    return rewards, state, scores, total
+
 
 def test_agent(env, agent, enpisodes): 
     
@@ -214,17 +224,22 @@ def run(problematic_program, target_state, test_code):
     data = deepcopy(makeData.convertData(problematic_program))
     datatg = deepcopy(makeData.convertData(target_state))    
     env = DeltaDebuggingEnv(data, datatg)    
-    agent = DQNAgent(env, epsilon = 0.19, gamma = 0.75)    
+    epsilon = 0.05
+    gamma = 0.9
+    agent = DQNAgent(env, epsilon, gamma)    
     
-    rewards, state, scores = train_agent(env, agent, 1000)
+    rewards, state, scores, total = train_agent(env, agent, 1000)    
     
     print("Pro 1:",state)    
     temp = state
     print(data.convertto(temp))
     saveData = datasave()
-    saveData.save_model_parameters(agent, "_agent.txt")
-    saveData.save_training_data(env, "_train.txt")    
+    temp = "epsilon"+str(epsilon)+ " - gamma" + str(gamma)
+    saveData.save_model_parameters(agent, "_agent "+temp+".txt", rewards, state, scores)
+    saveData.save_training_data(env, "_train "+temp+".txt")    
     print("End agent")
+
+    #total.sort()
     
     dataTest = makeData.convertData(test_code)
     treep = dataTest.tree    
@@ -251,10 +266,30 @@ def run(problematic_program, target_state, test_code):
     print(dataTest.convertto(temp))
     """
     end = time()-start
-    print(f"Duration: {end}")
-    plot_running_avg(rewards, "Rewards")
-    plot_running_avg(scores,"Scores") 
-    print("agent", len(agent.memory),temp)   
+    print(f"Duration: {end/60}")
+    plot_running_avg(rewards, "Rewards (epsilon = "+str(epsilon)+ " - gamma = " + str(gamma)+")") 
+    plot_running_avg(scores,"Scores (epsilon = "+str(epsilon)+ " - gamma = " + str(gamma)+")") 
+    print("agent", len(agent.memory),temp)  
+
+
+     # start
+     #sorted(data, key=lambda row: row[1], reverse=True)
+    #total #[avg_reward, avg_scores, state]
+    #total.append([count,avg_reward, avg_scores, state])
+    sorted_data = sorted(total, key=lambda row: row[1], reverse=True)
+    for i in range(10):
+        print(i,sorted_data[i][0], sorted_data[i][1], sorted_data[i][2])
+        print(data.convertto(sorted_data[i][3]))
+        print("---------------------------------")
+    #- end
+
+    sorted_data = sorted(agent.memory, key=lambda row: row[2], reverse=True)
+
+    for i in range(10):
+        print(i,sorted_data[i][0], sorted_data[i][1], sorted_data[i][2])        
+        print(data.convertto(sorted_data[i][0]))
+        print("---------------------------------")
+
 if __name__ == "__main__":
     problematic_program = """
 def f1():

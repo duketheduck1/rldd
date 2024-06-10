@@ -6,7 +6,7 @@ import csv
 import os
 class datasave():
 
-    def save_model_parameters(self, model, filepath):
+    def save_model_parameters(self, model, filepath, rewards, state, scores):
         """
         Save the parameters of the RL agent's model to disk.
 
@@ -15,7 +15,7 @@ class datasave():
         - filepath: The filepath to save the model parameters.
         """
         with open(filepath, 'wb') as file:
-            pickle.dump(model.get_parameters(), file)
+            pickle.dump(model.get_parameters(rewards, state, scores), file)
 
     def load_model_parameters(self, filepath):
         """
@@ -307,6 +307,8 @@ def load_training_history(filepath):
         for row in reader:
             history.append(dict(row))
     return history
+
+
 #-----------
 """
 
@@ -381,3 +383,17 @@ metadata = {
     }
 }
 """
+
+def load_model_parameters(filepath):
+        """
+        Load the parameters of the RL agent's model from disk.
+
+        Args:
+        - filepath: The filepath to load the model parameters from.
+
+        Returns:
+        - model_parameters: The loaded model parameters.
+        """
+        with open(filepath, 'rb') as file:
+            model_parameters = pickle.load(file)
+        return model_parameters
